@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"iter"
 	"math"
+	"sync"
+	"time"
 	"unicode/utf8"
 )
 
@@ -263,6 +265,166 @@ func checkErrors(err error, errors1 []error) {
 	}
 }
 
+func goThreadTrial(wg *sync.WaitGroup, threadNum int) {
+	defer wg.Done()
+	fmt.Printf("function - %d started and sleeping for 1 second\n", threadNum)
+	time.Sleep(time.Second)
+	fmt.Printf("function - %d done\n", threadNum)
+}
+
+//"A goroutine is a lightweight thread of execution." -
+
+func goMultiThreadTrial() {
+	start := time.Now()
+
+	var wg sync.WaitGroup
+
+	for i := range 3 {
+		wg.Add(1)
+		go goThreadTrial(&wg, i)
+	}
+
+	wg.Wait()
+	//rather than taking 3 seconds it takes only one
+	fmt.Printf("total time taken : %f\n", time.Since(start).Seconds())
+}
+
+func channelDemo() {
+	//"Channels are the pipes that connect concurrent goroutines. You can send values into channels from one goroutine and receive those values into another goroutine." - https://gobyexample.com/channels
+	//
+
+	messages := make(chan string)
+
+	go func() {
+		messages <- "Hello from anonymous process"
+	}()
+
+	//By default sends and receives block until both the sender and receiver are ready. This property allowed us to wait at the end of our program for the "ping" message without having to use any other synchronization. - https://gobyexample.com/channels
+	msg := <-messages
+	fmt.Println(msg)
+}
+
+func bufferedChannelDemo() {
+	messages := make(chan string, 3)
+
+	for i := range 3 {
+		func() {
+			messages <- fmt.Sprintf("Hello from function - %d", i)
+		}()
+	}
+
+	var msg string
+
+	for range 3 {
+		msg = <-messages
+		fmt.Println(msg)
+	}
+}
+
+func blockFunc(msg *chan string) {
+	fmt.Printf("function started and sleeping for 1 second\n")
+	time.Sleep(time.Second)
+	fmt.Printf("function done\n")
+	*msg <- "done"
+}
+
+func blockingAFunctionUsingChannelSync() {
+	messages := make(chan string, 1) //go panics if nots buffered to one???
+	blockFunc(&messages)
+	<-messages //this blocks the function till blockFunc() send the message
+}
+
+func sendOnlyChannelFunc(msg chan<- string, wg *sync.WaitGroup) {
+	msg <- "Hello from send only function"
+	wg.Done()
+}
+
+func receiveOnlyChannelFunc(msg <-chan string, wg *sync.WaitGroup) {
+	message := <-msg
+	fmt.Printf("message received at receive only functions : %s\n", message)
+	wg.Done()
+}
+
+func sendReceiveOnlyFunctionsDemo() {
+	messages := make(chan string, 1)
+	var wg sync.WaitGroup
+
+	wg.Add(2)
+	go sendOnlyChannelFunc(messages, &wg)
+	go receiveOnlyChannelFunc(messages, &wg)
+
+	wg.Wait()
+}
+
+func chan1Demo(msg chan<- string) {
+	time.Sleep(3 * time.Second)
+	msg <- "done"
+}
+
+func chan2Demo(msg chan<- string) {
+	time.Sleep(2 * time.Second)
+	msg <- "done"
+}
+
+func selectDemo() {
+	chan1 := make(chan string)
+	chan2 := make(chan string)
+
+	go chan1Demo(chan1)
+	go chan2Demo(chan2)
+
+	//which ever channel sends the first message select takes that and executes that case and returns
+	select {
+	case msg1 := <-chan1:
+		fmt.Printf("message received from channel 1 : %s\n", msg1)
+
+	case msg2 := <-chan2:
+		fmt.Printf("message received from channel 2 : %s\n", msg2)
+	}
+}
+
+func timeoutDemo() {
+	chan1 := make(chan string)
+	chan2 := make(chan string)
+
+	go chan1Demo(chan1)
+	go chan2Demo(chan2)
+
+	select {
+	case msg1 := <-chan1:
+		fmt.Printf("message received from channel 1 : %s\n", msg1)
+
+	case msg2 := <-chan2:
+		fmt.Printf("message received from channel 2 : %s\n", msg2)
+
+	case <-time.After(time.Second):
+		fmt.Println("timedout - 1 second timeout")
+	}
+}
+
+func nonBlockingChannelDemo() {
+	//non blocking operations ???
+	chan1 := make(chan string)
+	chan2 := make(chan string)
+
+	go chan1Demo(chan1)
+	go chan2Demo(chan2)
+
+	select {
+	case msg1 := <-chan1:
+		fmt.Printf("message received from channel 1 : %s\n", msg1)
+
+	case msg2 := <-chan2:
+		fmt.Printf("message received from channel 2 : %s\n", msg2)
+
+	case <-time.After(time.Second):
+		fmt.Println("timedout - 1 second timeout")
+
+	default:
+		fmt.Println("default case")
+	}
+}
+
 func main() {
 	fmt.Println("Hello, World!!!")
 	fmt.Println("1 + 2 = ", add(1, 2))
@@ -382,4 +544,13 @@ func main() {
 	errors := []error{err2, err3}
 	checkErrors(err2, errors)
 	checkErrors(err3, errors)
+
+	goMultiThreadTrial()
+	channelDemo()
+	bufferedChannelDemo()
+	blockingAFunctionUsingChannelSync()
+	sendReceiveOnlyFunctionsDemo()
+	selectDemo()
+	timeoutDemo()
+	nonBlockingChannelDemo()
 }
