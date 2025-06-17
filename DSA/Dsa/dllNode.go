@@ -1,12 +1,12 @@
 package dsa
 
 type DllNode[T comparable] struct {
-	data T
-	prev *DllNode[T]
-	next *DllNode[T]
+	Data T
+	Prev *DllNode[T]
+	Next *DllNode[T]
 }
 
 func (d *DllNode[T]) CreateDllNode(data T) *DllNode[T] {
-	newDllNode := DllNode[T]{data: data, next: nil}
+	newDllNode := DllNode[T]{Data: data, Next: nil}
 	return &newDllNode
 }
