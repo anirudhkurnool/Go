@@ -39,6 +39,10 @@ func (rbt *Rbt[T]) InsertNodeRbt(data T) {
 	rbt.Root = rbt.insertBalance(rbt.Root)
 }
 
+func (rbt *Rbt[T]) insertBalance(root *RbtNode[T]) *RbtNode[T] {
+	return nil
+}
+
 func (rbt *Rbt[T]) DeleteNodeRbt(data T) {
 	var deletedNodeColor color
 	rbt.Root = DeleteRecursiveRbt[T](rbt.Root, data, &deletedNodeColor)
@@ -46,6 +50,10 @@ func (rbt *Rbt[T]) DeleteNodeRbt(data T) {
 	if deletedNodeColor == BLACK {
 		rbt.Root = rbt.deleteBalance(rbt.Root)
 	}
+}
+
+func (rbt *Rbt[T]) deleteBalance(root *RbtNode[T]) *RbtNode[T] {
+	return nil
 }
 
 func (rbt *Rbt[T]) leftRotate(parent *RbtNode[T]) {
@@ -78,12 +86,7 @@ func InsertRecursiveRbt[T constraints.Ordered](root *RbtNode[T], data T) *RbtNod
 	return root
 }
 
-func (avl *Rbt[T]) Delete(data T) {
-	avl.Root = DeleteRecursiveRbt[T](avl.Root, data)
-	avl.NumNodes -= 1
-}
-
-func DeleteRecursiveRbt[T constraints.Ordered](root *RbtNode[T], data T) *RbtNode[T] {
+func DeleteRecursiveRbt[T constraints.Ordered](root *RbtNode[T], data T, clr *color) *RbtNode[T] {
 	if root == nil {
 		return nil
 	}
@@ -93,7 +96,7 @@ func DeleteRecursiveRbt[T constraints.Ordered](root *RbtNode[T], data T) *RbtNod
 			return nil
 		} else if root.LeftChild != nil && root.RightChild != nil {
 			root.Data = LeftMostNodeRbt(root.RightChild).Data
-			root.RightChild = DeleteRecursiveRbt[T](root.RightChild, root.Data)
+			root.RightChild = DeleteRecursiveRbt[T](root.RightChild, root.Data, clr)
 		} else if root.LeftChild != nil {
 			return root.LeftChild
 		} else if root.RightChild != nil {
@@ -102,9 +105,9 @@ func DeleteRecursiveRbt[T constraints.Ordered](root *RbtNode[T], data T) *RbtNod
 	}
 
 	if root.Data > data {
-		root.LeftChild = DeleteRecursiveRbt[T](root.LeftChild, data)
+		root.LeftChild = DeleteRecursiveRbt[T](root.LeftChild, data, clr)
 	} else if root.Data < data {
-		root.RightChild = DeleteRecursiveRbt[T](root.RightChild, data)
+		root.RightChild = DeleteRecursiveRbt[T](root.RightChild, data, clr)
 	}
 
 	return root

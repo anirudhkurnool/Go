@@ -5,7 +5,7 @@ type Queue[T comparable] struct {
 	Length uint
 }
 
-func (q *Queue[T]) CreateQueue(initialSize uint) *Queue[T] {
+func CreateQueue[T comparable](initialSize uint) *Queue[T] {
 	_q := &Queue[T]{Arr: make([]T, initialSize), Length: 0}
 	return _q
 }

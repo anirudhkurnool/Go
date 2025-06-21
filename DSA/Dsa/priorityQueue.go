@@ -11,8 +11,8 @@ type PriorityQueue[T constraints.Ordered] struct {
 	Length uint
 }
 
-func (pq *PriorityQueue[T]) CreatePriorityQueue() *PriorityQueue[T] {
-	_pq := PriorityQueue[T]{heap: pq.heap.CreateHeap(3, true), Length: 0}
+func CreatePriorityQueue[T constraints.Ordered]() *PriorityQueue[T] {
+	_pq := PriorityQueue[T]{heap: CreateHeap[T](3, true), Length: 0}
 	return &_pq
 }
 
@@ -20,7 +20,7 @@ func (pq *PriorityQueue[T]) Insert(data T) {
 	pq.heap.Insert(data)
 }
 
-func (pq *PriorityQueue[T]) Deque() T {
+func (pq *PriorityQueue[T]) Dequeue() T {
 	return pq.heap.DeleteRoot()
 }
 

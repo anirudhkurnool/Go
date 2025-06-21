@@ -13,7 +13,7 @@ type Heap[T constraints.Ordered] struct {
 	Min    bool
 }
 
-func (h *Heap[T]) CreateHeap(initialSize uint, isMinHeap bool) *Heap[T] {
+func CreateHeap[T constraints.Ordered](initialSize uint, isMinHeap bool) *Heap[T] {
 	_h := Heap[T]{arr: make([]T, initialSize), Length: 0, Min: isMinHeap}
 	return &_h
 }

@@ -5,7 +5,7 @@ type Stack[T comparable] struct {
 	Length uint //is this useful???
 }
 
-func (s *Stack[T]) CreateStack(initialSize uint) *Stack[T] {
+func CreateStack[T comparable](initialSize uint) *Stack[T] {
 	stack := Stack[T]{Arr: make([]T, initialSize), Length: 0}
 	return &stack
 }
