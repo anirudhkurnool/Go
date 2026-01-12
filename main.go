@@ -7,6 +7,8 @@ import (
 	"maps"
 	"math"
 	"slices"
+	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 )
@@ -848,6 +850,280 @@ func main() {
 
 	fmt.Println(<-ch1)
 	fmt.Println(<-ch1)
+
+	//	We can use channels to synchronize execution across goroutines.
+
+	msgChan := make(chan bool, 1)
+
+	go func(msg chan bool) {
+		fmt.Println("function started")
+		time.Sleep(2 * time.Second)
+		fmt.Println("function stopped")
+		msg <- true
+	}(msgChan)
+
+	fmt.Println(<-msgChan) // until the message is recieved the main function won't go further
+	// if wew removed the above line the main function would terminate before the anonymous function's work is done
+
+	// When using channels as function parameters, you can specify if a channel is meant to only send or receive values. This specificity increases the type-safety of the program.
+
+	// The function below only accepts a channel for sending values. It would be a compile-time error to try to receive on this channel.
+
+	go func(msg chan<- bool) { // send only channel
+		fmt.Println("function started")
+		time.Sleep(2 * time.Second)
+		fmt.Println("function stopped")
+		msg <- true
+	}(msgChan) // channels can be reused ?
+
+	fmt.Println(<-msgChan)
+
+	msgChan <- true
+
+	go func(msg <-chan bool) { // receive only channel
+		fmt.Println("function started")
+		fmt.Println(<-msg) // receive the message
+		fmt.Println("funtion stopped")
+	}(msgChan)
+
+	time.Sleep(2 * time.Second) // to wait for the above anonymous function to finish execution
+
+	// Go’s select lets you wait on multiple channel operations. Combining goroutines and channels with select is a powerful feature of Go.
+
+	msg1 := make(chan string, 1)
+	msg2 := make(chan string, 1)
+
+	go goFunc3(msg1)
+	go goFunc4(msg2)
+
+	for range 2 { // to wait goFunc4 to finish execution . without this the select would return the result of the  first channel that returns
+		select { // we are waiting on both the channel simulatenously. i.e. the total waited here would be (20 milliseconds) not 30(m1 (10) + m2 (20))
+		case m1 := <-msg1:
+			{
+				fmt.Println(m1)
+			}
+
+		case m2 := <-msg2:
+			{
+				fmt.Println(m2)
+			}
+		}
+	}
+
+	// Timeouts are important for programs that connect to external resources or that otherwise need to bound execution time. Implementing timeouts in Go is easy and elegant thanks to channels and select.
+
+	// Here’s the select implementing a timeout. res := <-c1 awaits the result and <-time.After awaits a value to be sent after the timeout of 1s. Since select proceeds with the first receive that’s ready, we’ll take the timeout case if the operation takes more than the allowed 1s.
+
+	go func(msg chan<- bool) {
+		time.Sleep(time.Second)
+		msg <- true
+	}(msgChan)
+
+	select {
+	case m1 := <-msgChan:
+		{
+			fmt.Println(m1)
+		}
+
+	case <-time.After(2 * time.Second): // if the msgChan doesn't return in 2 seconds this block will be executed. this happens in the next example
+		{
+			fmt.Println("timeout...")
+		}
+	}
+
+	go func(msg chan<- bool) {
+		time.Sleep(3 * time.Second)
+		msg <- true
+	}(msgChan)
+
+	select {
+	case m1 := <-msgChan:
+		{
+			fmt.Println(m1)
+		}
+
+	case <-time.After(2 * time.Second):
+		{
+			fmt.Println("timeout...")
+		}
+	}
+
+	// Basic sends and receives on channels are blocking. However, we can use select with a default clause to implement non-blocking sends, receives, and even non-blocking multi-way selects.
+
+	// If a value is available on messages then select will take the <-messages case with that value. If not it will immediately take the default case.
+
+	go goFunc3(msg1)
+	go goFunc4(msg2)
+
+	select {
+	case m1 := <-msg1:
+		{
+			fmt.Println(m1)
+		}
+
+	case m2 := <-msg2:
+		{
+			fmt.Println(m2)
+		}
+
+	default:
+		{
+			fmt.Println("default case....")
+		}
+	}
+
+	// to close a channel
+	msg3 := make(chan int)
+
+	go func(msg chan<- int) {
+		for i := range 3 {
+			msg <- i
+		}
+
+		close(msg)
+	}(msg3)
+
+	// It repeatedly receives from jobs with j, more := <-jobs. In this special 2-value form of receive, the more value will be false if jobs has been closed and all values in the channel have already been received. We use this to notify on done when we’ve worked all our jobs.
+	for {
+		j, more := <-msg3 // The optional second return value is true if the value received was delivered by a successful send operation to the channel, or false if it was a zero value generated because the channel is closed and empty.
+		if more {
+			fmt.Println("received job - ", j)
+		} else {
+			fmt.Println("channel closed")
+			break
+		}
+	}
+
+	// we can use range to iterate over values of a buffered channel
+	msg4 := make(chan string, 2)
+
+	msg4 <- "one"
+	msg4 <- "two"
+	close(msg4) // it’s possible to close a non-empty channel but still have the remaining values be received.
+	for m := range msg4 {
+		fmt.Println(m)
+	}
+
+	// --------------------------------------- 16 Timers and Tickers ---------------------------------------
+	// We often want to execute Go code at some point in the future, or repeatedly at some interval. Go’s built-in timer and ticker features make both of these tasks easy.
+
+	// Timers represent a single event in the future. You tell the timer how long you want to wait, and it provides a channel that will be notified at that time.
+
+	timer1 := time.NewTimer(2 * time.Second)
+
+	<-timer1.C // to start the timer
+	// blocks on the timer’s channel C until it sends a value indicating that the timer fired.
+	fmt.Println("timer1 done")
+
+	// If you just wanted to wait, you could have used time.Sleep. One reason a timer may be useful is that you can cancel the timer before it fires.
+	timer2 := time.NewTimer(2 * time.Second)
+
+	go func() {
+		<-timer2.C
+		fmt.Println("timer2 done")
+	}()
+
+	fmt.Println(timer2.Stop()) // we were able to stop this timer as thes timer2 started in another thread and main would move on from the above anonymous function to execute the above line as the timer is running
+
+	// tickers are for when you want to do something repeatedly at regular intervals.
+	ticker := time.NewTicker(500 * time.Millisecond)
+	done := make(chan bool)
+
+	go func() {
+		for {
+			select {
+			case <-done:
+				{
+					return
+				}
+
+			case t := <-ticker.C:
+				{
+					fmt.Println("ticker ticked : ", t)
+				}
+			}
+		}
+	}()
+
+	time.Sleep(1600 * time.Millisecond)
+	ticker.Stop()
+	done <- true
+	fmt.Println("ticker stopped")
+
+	// ------------------------------------- 17 Worker Pools -----------------------------------
+	// a worker pool of go routines
+	const numWorkers = 5
+	jobs := make(chan string, 5)
+	results := make(chan string, 5)
+
+	for i := range numWorkers {
+		go worker(i, jobs, results)
+	}
+
+	for i := range numWorkers {
+		jobs <- string(i)
+	}
+
+	for _ = range numWorkers {
+		fmt.Println(<-results)
+	}
+
+	// ------------------------------------ 18 Wait Groups ----------------------------------------
+	// To wait for multiple goroutines to finish, we can use a wait group.
+	// Note that this approach has no straightforward way to propagate errors from workers. For more advanced use cases, consider using the errgroup package ???
+
+	var wg sync.WaitGroup
+
+	for i := range 5 {
+		wg.Add(1)
+		go worker1(i, &wg)
+	}
+
+	wg.Wait()
+
+	fmt.Println("----------------------------------------------")
+
+	// another way to do above thing
+	for i := range 5 {
+		wg.Go(func() { worker2(i) })
+	}
+
+	wg.Wait()
+
+	// Rate limiting is an important mechanism for controlling resource utilization and maintaining quality of service. Go elegantly supports rate limiting with goroutines, channels, and tickers.
+	// atomic integers
+	var atInt atomic.Uint64 // default value 0 ?
+
+	for range 50 {
+		wg.Go(func() { atInt.Add(1) })
+	}
+
+	wg.Wait()
+
+	// Here no goroutines are writing to ‘ops’, but using Load it’s safe to atomically read a value even while other goroutines are (atomically) updating it.
+	fmt.Println(atInt.Load())
+
+	// -race flag ???
+	// ------------------------------------------ 19 MUTEX ----------------------------------------
+	// For simpler primitive values we can use their atomic versions. For more complex state we can use a mutex to safely access data across multiple goroutines.
+	v1 := ValueWithMutex{a: 0}
+
+	for range 100 {
+		wg.Go(func() { v1.inc() })
+	}
+
+	wg.Wait()
+
+	fmt.Println(v1.a)
+
+	// ----------------------------- 20 Stateful Go Routines -----------------------------
+
+	// Another option is to use the built-in synchronization features of goroutines and channels to achieve the same result. This channel-based approach aligns with Go’s ideas of sharing memory by communicating and having each piece of data owned by exactly 1 goroutine ?
+
+	// var readOps int
+
+	// var writeOps int
+
 }
 
 // func function-name(<arg1 type>) return-type { body }
@@ -1252,4 +1528,60 @@ func goFunc2() {
 		fmt.Println("func - 2 ; task - ", i)
 		time.Sleep(1000 * time.Millisecond)
 	}
+}
+
+// -------------------------------- test functions for select ------------------------------
+func goFunc3(msg chan string) {
+	time.Sleep(10 * time.Millisecond)
+	msg <- "Hello from goFunc3"
+}
+
+func goFunc4(msg chan string) {
+	time.Sleep(20 * time.Millisecond)
+	msg <- "Hello from goFunc4"
+}
+
+// ------------------------------- workers ---------------------------------
+func worker(id int, jobs <-chan string, results chan<- string) {
+	for i := range jobs {
+		time.Sleep(time.Second)
+		fmt.Println("job - ", id, " done")
+		results <- (i + i)
+	}
+}
+
+func worker1(id int, wg *sync.WaitGroup) {
+	fmt.Println("worker - ", id, " started ")
+	time.Sleep(2 * time.Second)
+	fmt.Println("worker - ", id, " stopped ")
+	wg.Done()
+}
+
+func worker2(id int) {
+	fmt.Println("worker2 - ", id, " started ")
+	time.Sleep(2 * time.Second)
+	fmt.Println("worker2 - ", id, " stopped ")
+}
+
+type ValueWithMutex struct {
+	a     int
+	mutex sync.Mutex
+}
+
+func (v *ValueWithMutex) inc() {
+	v.mutex.Lock()
+	defer v.mutex.Unlock()
+	v.a++
+}
+
+// ----------------------------- Stateful Go Routines -----------------------------
+type readOp struct {
+	key  int
+	resp chan int
+}
+
+type writeOp struct {
+	key  int
+	val  int
+	resp chan int
 }
