@@ -1,6 +1,6 @@
 package dsa
 
 type SllNode[T any] struct {
-	data int
+	data T
 	next *SllNode[T]
 }

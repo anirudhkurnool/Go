@@ -1,11 +1,13 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"iter"
 	"maps"
 	"math"
+	"os"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -1124,6 +1126,41 @@ func main() {
 
 	// var writeOps int
 
+	// ----------------------------- 21 JSON Files -------------------------------------------
+
+	// reading data from a json file
+	// file we need to define a struct which will be exactly in the shape of what we are going to read
+
+	// first open the file
+	data, err := os.ReadFile("trial.json")
+
+	if err != nil {
+		fmt.Println("error while reading trial.json", err)
+	}
+
+	// declare the slice in which json objects (after convertion to the predefined type) will be stored
+	var trialJsonData []TrialJsonRead
+
+	// parse the data and convert it to defined type
+	err = json.Unmarshal(data, &trialJsonData)
+
+	if err != nil {
+		fmt.Println("error while unmarshalling trial.json", err)
+	}
+
+	fmt.Println(trialJsonData)
+
+	// writing data to the JSON file
+	newJsonElement := TrialJsonRead{A: 4, B: true, C: 4.312}
+
+	trialJsonData = append(trialJsonData, newJsonElement)
+
+	// writing data
+	data, err = json.MarshalIndent(trialJsonData, "", "    ")
+
+	fmt.Println(string(data), err)
+	// the data has to be written to the file using os module
+	os.WriteFile("trial.json", data, 0644)
 }
 
 // func function-name(<arg1 type>) return-type { body }
@@ -1584,4 +1621,12 @@ type writeOp struct {
 	key  int
 	val  int
 	resp chan int
+}
+
+// ----------------------------------------- JSON ---------------------------------
+
+type TrialJsonRead struct {
+	A int     `JSON:"A"`
+	B bool    `JSON:"B"`
+	C float64 `JSON:"C"`
 }
